@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Grouping Tool</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Light mode base colors (Inverted Grey theme) */
+            background-color: #f0f0f0; /* Very light grey */
+            color: #333333; /* Dark grey text */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center content vertically */
+            align-items: center; /* Center content horizontally */
+        }
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto; /* Adjusted margin */
+            padding: 1.5rem;
+            /* Lighter container with more rounded corners */
+            background-color: #ffffff; /* White */
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1); /* Lighter, more subtle shadow */
+            border-radius: 1.5rem; /* More rounded-2xl / rounded-3xl */
+            flex-grow: 1;
+        }
+        @media (min-width: 640px) { /* Small screens and up */
+            .container {
+                padding: 2.5rem; /* Increased padding for larger screens */
+            }
+        }
+
+        .drop-zone {
+            border: 3px dashed #cccccc; /* Medium light grey */
+            background-color: #f5f5f5; /* Very light grey for zone */
+            border-radius: 1.5rem; /* More rounded */
+            padding: 2.5rem;
+            text-align: center;
+            transition: background-color 0.2s, border-color 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+        .drop-zone.dragover {
+            background-color: #eeeeee; /* Slightly darker light grey on hover */
+            border-color: #aaaaaa; /* Darker grey border */
+        }
+        .file-input-label {
+            display: inline-block;
+            cursor: pointer;
+            background-color: #bbbbbb; /* Medium grey button */
+            color: #333333; /* Dark text for button */
+            padding: 0.75rem 1.75rem; /* Slightly more padding */
+            border-radius: 9999px; /* Fully rounded/pill shape */
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); /* Stronger shadow */
+            margin-top: 1.5rem; /* More spacing */
+            font-weight: 600; /* Semi-bold */
+        }
+        .file-input-label:hover {
+            background-color: #aaaaaa; /* Darker grey on hover */
+            transform: translateY(-2px); /* Slight lift effect */
+        }
+        .hidden-input {
+            display: none;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.85); /* Lighter overlay */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+            color: #333333; /* Dark text on overlay */
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1); /* Darker spinner border */
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #666666; /* Medium grey for spinner */
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Custom styles for section backgrounds and borders */
+        .section-upload {
+            background-color: #e8e8e8; /* Light grey background for upload section */
+            border: 1px solid #d0d0d0; /* Lighter border */
+            border-radius: 1.25rem; /* More rounded corners */
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08); /* Inner shadow for depth */
+        }
+        .section-options {
+            background-color: #e8e8e8; /* Same light background for options section */
+            border: 1px solid #d0d0d0;
+            border-radius: 1.25rem;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08);
+        }
+        .section-results {
+            background-color: #e8e8e8; /* Same light background for results section */
+            border: 1px solid #d0d0d0;
+            border-radius: 1.25rem;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Styling for select and number inputs */
+        select, input[type="number"] {
+            background-color: #f5f5f5; /* Light input background */
+            color: #333333; /* Dark text */
+            border: 1px solid #cccccc; /* Lighter border */
+            border-radius: 0.75rem; /* More rounded */
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1); /* Subtle inner shadow */
+        }
+        select:focus, input[type="number"]:focus {
+            border-color: #666666; /* Highlight on focus */
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 102, 102, 0.3); /* Ring effect */
+        }
+        /* Radio button styling adjustments */
+        .form-radio {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            display: inline-block;
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 50%;
+            border: 2px solid #888888; /* Darker grey border */
+            background-color: #f5f5f5; /* Light background */
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .form-radio:checked {
+            background-color: #888888; /* Filled darker grey when checked */
+            border-color: #888888;
+        }
+        .form-radio:checked::after {
+            content: '';
+            display: block;
+            width: 0.5rem;
+            height: 0.5rem;
+            background-color: #ffffff; /* White dot inside */
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .form-radio:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(136, 136, 136, 0.3);
+        }
+
+        /* Generate and Download buttons */
+        #generateGroups, #downloadAllGroups {
+            border-radius: 9999px; /* Fully rounded/pill shape */
+            padding: 0.9rem 2rem; /* Adjusted padding */
+            font-size: 1.125rem; /* Larger text */
+            background: linear-gradient(to right, #606060, #404040); /* Darker grey gradient background */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); /* Lighter shadow */
+            transition: all 0.2s ease-in-out;
+            color: #e0e0e0; /* Light text for buttons */
+        }
+        #generateGroups:hover:not(:disabled), #downloadAllGroups:hover:not(:disabled) {
+            background: linear-gradient(to right, #404040, #606060); /* Reverse gradient on hover */
+            transform: translateY(-3px); /* More pronounced lift */
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
+        }
+        #generateGroups:disabled {
+            background: #cccccc; /* Lighter disabled color */
+            cursor: not-allowed;
+            opacity: 0.6;
+            box-shadow: none;
+            transform: none;
+            color: #666666; /* Darker text on disabled button */
+        }
+
+        /* Image group containers */
+        .group-container {
+            background-color: #f5f5f5; /* Light grey background for group containers */
+            border: 1px solid #d0d0d0;
+            border-radius: 1rem; /* Slightly less rounded than main container */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Lighter shadow for groups */
+        }
+        .group-title {
+            color: #555555; /* Darker grey for titles */
+            border-color: #d0d0d0; /* Lighter border for title separator */
+        }
+        /* Ensure image wrappers are consistently styled */
+        .img-wrapper {
+             border: 2px solid #cccccc; /* Light border for images */
+             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); /* Subtle shadow for images */
+        }
+        .img-element {
+            /* Object-fit and border-radius are important here */
+            border-radius: 0.5rem; /* Rounded corners for images themselves */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container bg-white shadow-xl rounded-xl my-8 p-8 sm:p-12">
+        <h1 class="text-4xl font-bold text-center mb-6 text-gray-700">Image Grouping Tool</h1>
+        <p class="text-center text-gray-600 mb-8">Upload your images, choose grouping options, and let the tool organize them!</p>
+
+        <!-- Upload Section -->
+        <div class="mb-8 p-6 section-upload">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700">1. Upload Your Images</h2>
+            <p class="text-sm text-gray-600 mb-4">
+                Drag and drop image files or folders here, or click to choose files. You can add more images at any time.
+                Supported formats: JPG, JPEG, PNG, GIF.
+            </p>
+            <div id="dropZone" class="drop-zone flex flex-col items-center justify-center">
+                <p class="text-lg font-semibold text-gray-700 mb-2">Drag & Drop Images Here</p>
+                <p class="text-sm text-gray-600 mb-4">or</p>
+                <input type="file" id="imageUpload" class="hidden-input" multiple accept="image/jpeg, image/png, image/gif" webkitdirectory mozdirectory>
+                <label for="imageUpload" class="file-input-label">Click to Choose Images</label>
+            </div>
+            <div id="fileCount" class="mt-4 text-gray-700 font-medium text-center">No files selected.</div>
+        </div>
+
+        <!-- Options Section -->
+        <div class="mb-8 p-6 section-options">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700">2. Configure Grouping</h2>
+
+            <div class="mb-5">
+                <label for="groupMethod" class="block text-gray-700 text-lg font-medium mb-2">Grouping Method:</label>
+                <select id="groupMethod" class="w-full p-3 border rounded-xl shadow-sm focus:ring-gray-600 focus:border-gray-600 transition duration-150 ease-in-out">
+                    <option value="dominantColor">Dominant Color</option>
+                    <option value="averageShade">Average Shade (Light/Medium/Dark)</option>
+                    <option value="hue">Hue</option>
+                    <option value="aspectRatio">Aspect Ratio (Portrait/Landscape/Square)</option>
+                    <option value="random">Random</option>
+                </select>
+            </div>
+
+            <div class="mb-5">
+                <label class="block text-gray-700 text-lg font-medium mb-2">Group By:</label>
+                <div class="flex items-center space-x-4 mb-3">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="groupingType" value="picsPerGroup" class="form-radio" checked>
+                        <span class="ml-2 text-gray-700">Pictures per Group</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="groupingType" value="numberOfGroups" class="form-radio">
+                        <span class="ml-2 text-gray-700">Number of Groups</span>
+                    </label>
+                </div>
+
+                <!-- Both input containers are now always visible -->
+                <div id="picsPerGroupContainer" class="mb-4">
+                    <label for="picsPerGroup" class="block text-gray-600 text-base font-medium mb-1">Pictures per Group/Carousel:</label>
+                    <input type="number" id="picsPerGroup" value="5" min="1" class="w-full p-3 border rounded-xl shadow-sm focus:ring-gray-600 focus:border-gray-600 transition duration-150 ease-in-out">
+                </div>
+
+                <div id="numberOfGroupsContainer">
+                    <label for="numberOfGroups" class="block text-gray-600 text-base font-medium mb-1">Number of Groups to Create:</label>
+                    <input type="number" id="numberOfGroups" value="3" min="1" class="w-full p-3 border rounded-xl shadow-sm focus:ring-gray-600 focus:border-gray-600 transition duration-150 ease-in-out">
+                </div>
+            </div>
+
+            <button id="generateGroups" class="w-full font-bold py-3 px-6 rounded-lg shadow-md transition duration-200 ease-in-out cursor-not-allowed opacity-50" disabled>
+                Generate Image Groups
+            </button>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="p-6 section-results min-h-[200px] flex items-center justify-center text-gray-600 text-center text-lg flex-col">
+            Your grouped images will appear here. Upload files and click "Generate Groups".
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner mb-4"></div>
+        <div id="loadingText" class="text-xl font-semibold text-gray-700">Processing images...</div>
+    </div>
+
+    <!-- JSZip Library for file compression -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- FileSaver.js for saving blobs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <script>
+        const imageUpload = document.getElementById('imageUpload');
+        const fileCountDisplay = document.getElementById('fileCount');
+        const groupMethodSelect = document.getElementById('groupMethod');
+        const picsPerGroupInput = document.getElementById('picsPerGroup');
+        const numberOfGroupsInput = document.getElementById('numberOfGroups');
+        const generateGroupsBtn = document.getElementById('generateGroups');
+        const resultsDiv = document.getElementById('results');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const groupingTypeRadios = document.querySelectorAll('input[name="groupingType"]');
+        const picsPerGroupContainer = document.getElementById('picsPerGroupContainer');
+        const numberOfGroupsContainer = document.getElementById('numberOfGroupsContainer');
+        const dropZone = document.getElementById('dropZone');
+
+        let loadedImages = [];
+        let currentGroupedImages = [];
+
+        // --- Drag and Drop Event Listeners ---
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+
+            const items = e.dataTransfer.items;
+            const filesToLoad = [];
+
+            showLoading('Scanning dropped items...');
+
+            const scanFilesAndFolders = async (item) => {
+                return new Promise(resolve => {
+                    if (item.kind === 'file') {
+                        const file = item.getAsFile();
+                        if (file && file.type.startsWith('image/')) {
+                            filesToLoad.push(file);
+                        }
+                        resolve();
+                    } else if (item.kind === 'directory') {
+                        const directoryReader = item.createReader();
+                        const readEntries = async () => {
+                            try {
+                                const entries = await new Promise((res, rej) => directoryReader.readEntries(res, rej));
+                                if (!entries.length) {
+                                    resolve();
+                                    return;
+                                }
+                                await Promise.all(entries.map(entry => {
+                                    if (entry.isFile) {
+                                        return new Promise(fileResolve => entry.file(f => {
+                                            if (f.type.startsWith('image/')) {
+                                                filesToLoad.push(f);
+                                            }
+                                            fileResolve();
+                                        }));
+                                    } else if (entry.isDirectory) {
+                                        return scanFilesAndFolders(entry);
+                                    }
+                                    return Promise.resolve();
+                                }));
+                                readEntries();
+                            } catch (err) {
+                                console.error('Error reading directory entries:', err);
+                                resolve();
+                            }
+                        };
+                        readEntries();
+                    } else {
+                        resolve();
+                    }
+                });
+            };
+
+            const promises = [];
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i].webkitGetAsEntry();
+                if (item) {
+                    promises.push(scanFilesAndFolders(item));
+                }
+            }
+
+            await Promise.all(promises);
+            await addImagesToList(filesToLoad);
+            hideLoading();
+        });
+
+
+        // Event listener for standard file input change
+        imageUpload.addEventListener('change', async (event) => {
+            const files = event.target.files;
+            if (files.length > 0) {
+                await addImagesToList(Array.from(files));
+            } else {
+                if (loadedImages.length === 0) {
+                    fileCountDisplay.textContent = 'No files selected.';
+                    generateGroupsBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    generateGroupsBtn.disabled = true;
+                    resultsDiv.innerHTML = '<div class="text-gray-600 text-center text-lg">Your grouped images will appear here. Upload files and click "Generate Groups".</div>';
+                }
+            }
+            imageUpload.value = '';
+        });
+
+        groupingTypeRadios.forEach(radio => {
+            radio.addEventListener('change', (event) => {
+                // No change in visibility
+            });
+        });
+
+        async function addImagesToList(files) {
+            if (files.length === 0) {
+                return;
+            }
+
+            showLoading(`Adding ${files.length} new images...`);
+            
+            const newImagePromises = files.map(file => {
+                return new Promise((resolve) => {
+                    if (!file.type.startsWith('image/')) {
+                        console.warn(`Skipping non-image file: ${file.name}`);
+                        resolve(null);
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        resolve({
+                            file: file,
+                            dataURL: e.target.result,
+                            colorData: null,
+                            shadeData: null,
+                            hue: null,
+                            aspectRatio: null
+                        });
+                    };
+                    reader.onerror = (error) => {
+                        console.error(`Error reading file ${file.name}:`, error);
+                        resolve(null);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            });
+
+            const newLoadedImages = (await Promise.all(newImagePromises)).filter(img => img !== null);
+            loadedImages.push(...newLoadedImages);
+
+            fileCountDisplay.textContent = `${loadedImages.length} image files loaded in total.`;
+            generateGroupsBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            generateGroupsBtn.disabled = false;
+            hideLoading();
+        }
+
+        generateGroupsBtn.addEventListener('click', async () => {
+            if (loadedImages.length === 0) {
+                resultsDiv.innerHTML = '<div class="text-red-600 text-center text-lg">Please upload images first!</div>';
+                return;
+            }
+
+            const groupMethod = groupMethodSelect.value;
+            const groupingType = document.querySelector('input[name="groupingType"]:checked').value;
+            let picsPerGroup, numberOfGroups;
+
+            if (groupingType === 'picsPerGroup') {
+                picsPerGroup = parseInt(picsPerGroupInput.value, 10);
+                if (isNaN(picsPerGroup) || picsPerGroup < 1) {
+                    resultsDiv.innerHTML = '<div class="text-red-600 text-center text-lg">Please enter a valid number for pictures per group (at least 1).</div>';
+                    return;
+                }
+                if (picsPerGroup > loadedImages.length) {
+                    resultsDiv.innerHTML = `<div class="text-red-600 text-center text-lg">You only have ${loadedImages.length} images. Please enter a number less than or equal to the total images.</div>`;
+                    return;
+                }
+            } else {
+                numberOfGroups = parseInt(numberOfGroupsInput.value, 10);
+                if (isNaN(numberOfGroups) || numberOfGroups < 1) {
+                    resultsDiv.innerHTML = '<div class="text-red-600 text-center text-lg">Please enter a valid number for groups (at least 1).</div>';
+                    return;
+                }
+                if (numberOfGroups > loadedImages.length) {
+                     resultsDiv.innerHTML = `<div class="text-red-600 text-center text-lg">You cannot create ${numberOfGroups} groups with only ${loadedImages.length} images. The number of groups must be less than or equal to the total images.</div>`;
+                    return;
+                }
+                picsPerGroup = Math.ceil(loadedImages.length / numberOfGroups);
+            }
+
+
+            showLoading('Analyzing images for grouping...');
+
+            for (let i = 0; i < loadedImages.length; i++) {
+                const imgData = loadedImages[i];
+                if (imgData.colorData === null || imgData.shadeData === null || imgData.hue === null || imgData.aspectRatio === null) {
+                    const { dominantColor, averageLuminance, hue, aspectRatio } = await getImageProperties(imgData.dataURL);
+                    imgData.colorData = dominantColor;
+                    imgData.shadeData = averageLuminance;
+                    imgData.hue = hue;
+                    imgData.aspectRatio = aspectRatio;
+                }
+            }
+
+            let groupedImages = [];
+
+            const imagesToSort = [...loadedImages];
+
+            switch (groupMethod) {
+                case 'dominantColor':
+                    imagesToSort.sort((a, b) => {
+                        if (a.hue !== b.hue) return a.hue - b.hue;
+                        return a.shadeData - b.shadeData;
+                    });
+                    break;
+                case 'averageShade':
+                    imagesToSort.sort((a, b) => b.shadeData - a.shadeData); // Darkest to lightest
+                    break;
+                case 'hue':
+                    imagesToSort.sort((a, b) => a.hue - b.hue);
+                    break;
+                case 'aspectRatio':
+                    imagesToSort.sort((a, b) => {
+                        const categoryA = getAspectRatioCategory(a.aspectRatio);
+                        const categoryB = getAspectRatioCategory(b.aspectRatio);
+                        const order = { 'Square': 0, 'Portrait': 1, 'Landscape': 2 };
+                        return order[categoryA] - order[categoryB];
+                    });
+                    break;
+                case 'random':
+                    imagesToSort.sort(() => Math.random() - 0.5);
+                    break;
+            }
+
+            if (groupingType === 'picsPerGroup') {
+                for (let i = 0; i < imagesToSort.length; i += picsPerGroup) {
+                    groupedImages.push(imagesToSort.slice(i, i + picsPerGroup));
+                }
+            } else {
+                const imagesPerGroupExact = imagesToSort.length / numberOfGroups;
+                let currentIdx = 0;
+                for (let i = 0; i < numberOfGroups; i++) {
+                    const start = Math.floor(currentIdx);
+                    const end = Math.floor(currentIdx + imagesPerGroupExact);
+                    if (i === numberOfGroups - 1) {
+                        groupedImages.push(imagesToSort.slice(start));
+                    } else {
+                        groupedImages.push(imagesToSort.slice(start, end));
+                    }
+                    currentIdx += imagesPerGroupExact;
+                }
+                groupedImages = groupedImages.filter(group => group.length > 0);
+            }
+
+            currentGroupedImages = groupedImages;
+            displayGroupedImages(groupedImages, groupMethod);
+            hideLoading();
+        });
+
+        function showLoading(text) {
+            loadingText.textContent = text;
+            loadingOverlay.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingOverlay.classList.add('hidden');
+        }
+
+        function getImageProperties(dataURL) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    const aspectRatio = img.width / img.height;
+
+                    const maxWidth = 100;
+                    const scaleFactor = Math.min(maxWidth / img.width, maxWidth / img.height, 1);
+                    canvas.width = img.width * scaleFactor;
+                    canvas.height = img.height * scaleFactor;
+
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+                    let rSum = 0, gSum = 0, bSum = 0;
+                    let colorCounts = {};
+                    let maxCount = 0;
+                    let dominantColor = '#000000';
+
+                    const pixelStep = 4 * 10;
+                    for (let i = 0; i < imageData.length; i += pixelStep) {
+                        const r = imageData[i];
+                        const g = imageData[i + 1];
+                        const b = imageData[i + 2];
+
+                        rSum += r;
+                        gSum += g;
+                        bSum += b;
+
+                        const quantizedR = Math.floor(r / 32) * 32;
+                        const quantizedG = Math.floor(g / 32) * 32;
+                        const quantizedB = Math.floor(b / 32) * 32;
+                        const colorKey = `${quantizedR},${quantizedG},${quantizedB}`;
+
+                        colorCounts[colorKey] = (colorCounts[colorKey] || 0) + 1;
+                        if (colorCounts[colorKey] > maxCount) {
+                            maxCount = colorCounts[colorKey];
+                            dominantColor = rgbToHex(quantizedR, quantizedG, quantizedB);
+                        }
+                    }
+
+                    const numPixelsSampled = imageData.length / pixelStep;
+                    const avgR = rSum / numPixelsSampled;
+                    const avgG = gSum / numPixelsSampled;
+                    const avgB = bSum / numPixelsSampled;
+
+                    const averageLuminance = (0.2126 * avgR + 0.7152 * avgG + 0.0722 * avgB);
+                    const hue = rgbToHsl(avgR, avgG, avgB).h;
+
+                    resolve({ dominantColor, averageLuminance, hue, aspectRatio });
+                };
+                img.onerror = () => {
+                    console.error('Error loading image for processing:', dataURL);
+                    resolve({ dominantColor: '#FFFFFF', averageLuminance: 255, hue: 0, aspectRatio: 1 });
+                };
+                img.src = dataURL;
+            });
+        }
+
+        function rgbToHex(r, g, b) {
+            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+        }
+
+        function rgbToHsl(r, g, b) {
+            r /= 255, g /= 255, b /= 255;
+            var max = Math.max(r, g, b), min = Math.min(r, g, b);
+            var h, s, l = (max + min) / 2;
+
+            if (max == min) {
+                h = s = 0;
+            } else {
+                var d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            return { h: h * 360, s: s * 100, l: l * 100 };
+        }
+
+        function getAspectRatioCategory(aspectRatio) {
+            const tolerance = 0.1;
+            if (aspectRatio > 1 + tolerance) {
+                return 'Landscape';
+            } else if (aspectRatio < 1 - tolerance) {
+                return 'Portrait';
+            } else {
+                return 'Square';
+            }
+        }
+
+
+        function displayGroupedImages(groupedImages, method) {
+            resultsDiv.innerHTML = '';
+
+            if (groupedImages.length === 0) {
+                resultsDiv.innerHTML = '<div class="text-gray-600 text-center text-lg">No groups could be formed with the current settings.</div>';
+                return;
+            }
+
+            const methodTitles = {
+                dominantColor: 'Dominant Color',
+                averageShade: 'Average Shade',
+                hue: 'Hue',
+                aspectRatio: 'Aspect Ratio',
+                random: 'Random'
+            };
+
+            const header = document.createElement('h2');
+            header.className = 'text-2xl font-semibold mb-6 text-gray-700 text-center';
+            header.textContent = `3. Generated Groups by ${methodTitles[method]}`;
+            resultsDiv.appendChild(header);
+
+            groupedImages.forEach((group, index) => {
+                const groupContainer = document.createElement('div');
+                groupContainer.className = 'mb-8 p-4 group-container';
+
+                const groupTitle = document.createElement('h3');
+                groupTitle.className = 'text-xl font-medium mb-3 group-title border-b pb-2';
+
+                if (method === 'hue' && group.length > 0) {
+                    const avgHue = group.reduce((sum, img) => sum + img.hue, 0) / group.length;
+                    groupTitle.textContent = `Group ${index + 1} (Hue: ${Math.round(avgHue)}°)`;
+                    // Adjust HSL background and text colors for light mode visibility on grey background
+                    groupTitle.style.backgroundColor = `hsl(${avgHue}, 40%, 90%)`; /* Lighter background */
+                    groupTitle.style.color = `hsl(${avgHue}, 70%, 30%)`; /* Darker text */
+                } else if (method === 'averageShade' && group.length > 0) {
+                    const avgShade = group.reduce((sum, img) => sum + img.shadeData, 0) / group.length;
+                    const shadeCategory = avgShade < 85 ? 'Dark' : (avgShade < 170 ? 'Medium' : 'Light');
+                    groupTitle.textContent = `Group ${index + 1} (${shadeCategory})`;
+                } else if (method === 'aspectRatio' && group.length > 0) {
+                    const firstCategory = getAspectRatioCategory(group[0].aspectRatio);
+                    groupTitle.textContent = `Group ${index + 1} (${firstCategory})`;
+                } else {
+                    groupTitle.textContent = `Group ${index + 1}`;
+                }
+
+                groupContainer.appendChild(groupTitle);
+
+                const imagesWrapper = document.createElement('div');
+                imagesWrapper.className = 'flex flex-wrap gap-4 justify-center';
+
+                group.forEach(imgData => {
+                    const imgWrapper = document.createElement('div');
+                    imgWrapper.className = 'w-28 h-28 sm:w-32 sm:h-32 md:w-40 md:h-40 relative rounded-lg overflow-hidden shadow-lg img-wrapper transform transition-transform hover:scale-105 duration-200 cursor-pointer';
+
+                    const imgElement = document.createElement('img');
+                    imgElement.src = imgData.dataURL;
+                    imgElement.alt = imgData.file.name;
+                    imgElement.className = 'w-full h-full object-cover img-element';
+                    imgElement.title = `File: ${imgData.file.name}\nColor: ${imgData.colorData || 'N/A'}\nShade: ${imgData.shadeData ? imgData.shadeData.toFixed(2) : 'N/A'}\nHue: ${imgData.hue ? Math.round(imgData.hue) : 'N/A'}°\nAspect Ratio: ${imgData.aspectRatio ? getAspectRatioCategory(imgData.aspectRatio) : 'N/A'}`;
+
+                    imgWrapper.appendChild(imgElement);
+                    imagesWrapper.appendChild(imgWrapper);
+                });
+                groupContainer.appendChild(imagesWrapper);
+                resultsDiv.appendChild(imagesWrapper); /* Fixed: Appended imagesWrapper to resultsDiv, not groupContainer */
+            });
+
+            if (groupedImages.length > 0) {
+                const downloadButton = document.createElement('button');
+                downloadButton.id = 'downloadAllGroups';
+                downloadButton.className = 'mt-8 font-bold py-3 px-6 rounded-lg shadow-md transition duration-200 ease-in-out';
+                downloadButton.textContent = 'Download All Groups as ZIP';
+                resultsDiv.appendChild(downloadButton);
+
+                downloadButton.addEventListener('click', downloadGroupedImages);
+            }
+
+            resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function getContrastYIQ(hexcolor){
+            if (!hexcolor || hexcolor.length < 7) return '#333333';
+            const r = parseInt(hexcolor.substring(1,3),16);
+            const g = parseInt(hexcolor.substring(3,5),16);
+            const b = parseInt(hexcolor.substring(5,7),16);
+            const yiq = ((r*299)+(g*587)+(b*114))/1000;
+            return (yiq >= 128) ? '#1a1a1a' : '#e0e0e0';
+        }
+
+        async function downloadGroupedImages() {
+            if (currentGroupedImages.length === 0) {
+                resultsDiv.innerHTML = '<div class="text-red-600 text-center text-lg">No groups to download!</div>';
+                return;
+            }
+
+            showLoading('Preparing ZIP for download...');
+            const zip = new JSZip();
+
+            for (let i = 0; i < currentGroupedImages.length; i++) {
+                const group = currentGroupedImages[i];
+                const groupFolderName = `Group_${i + 1}`;
+                const groupFolder = zip.folder(groupFolderName);
+
+                for (let j = 0; j < group.length; j++) {
+                    const imgData = group[j];
+                    const fileName = imgData.file.name;
+                    const base64Content = imgData.dataURL.split(',')[1];
+                    groupFolder.file(fileName, base64Content, { base64: true });
+                }
+            }
+
+            try {
+                const blob = await zip.generateAsync({ type: "blob" });
+                saveAs(blob, "Image_Groups.zip");
+            } catch (error) {
+                console.error("Error generating ZIP:", error);
+                resultsDiv.innerHTML = '<div class="text-red-600 text-center text-lg">Failed to generate ZIP file. Please try again.</div>';
+            } finally {
+                hideLoading();
+            }
+        }
+    </script>
+</body>
+</html>
