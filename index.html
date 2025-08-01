@@ -242,6 +242,9 @@
                     <option value="averageShade">Average Shade (Light/Medium/Dark)</option>
                     <option value="hue">Hue</option>
                     <option value="aspectRatio">Aspect Ratio (Portrait/Landscape/Square)</option>
+                    <option value="theme">Theme/Aesthetic (Nature, Urban, Ocean, etc.)</option>
+                    <option value="season">Seasonal (Spring, Summer, Fall, Winter)</option>
+                    <option value="timeOfDay">Time of Day (Day, Night, Sunset, Sunrise)</option>
                     <option value="random">Random</option>
                 </select>
             </div>
@@ -432,7 +435,10 @@
                             colorData: null,
                             shadeData: null,
                             hue: null,
-                            aspectRatio: null
+                            aspectRatio: null,
+                            theme: null,
+                            season: null,
+                            timeOfDay: null
                         });
                     };
                     reader.onerror = (error) => {
@@ -490,12 +496,16 @@
 
             for (let i = 0; i < loadedImages.length; i++) {
                 const imgData = loadedImages[i];
-                if (imgData.colorData === null || imgData.shadeData === null || imgData.hue === null || imgData.aspectRatio === null) {
-                    const { dominantColor, averageLuminance, hue, aspectRatio } = await getImageProperties(imgData.dataURL);
+                if (imgData.colorData === null || imgData.shadeData === null || imgData.hue === null || imgData.aspectRatio === null || 
+                    imgData.theme === null || imgData.season === null || imgData.timeOfDay === null) {
+                    const { dominantColor, averageLuminance, hue, aspectRatio, theme, season, timeOfDay } = await getImageProperties(imgData.dataURL);
                     imgData.colorData = dominantColor;
                     imgData.shadeData = averageLuminance;
                     imgData.hue = hue;
                     imgData.aspectRatio = aspectRatio;
+                    imgData.theme = theme;
+                    imgData.season = season;
+                    imgData.timeOfDay = timeOfDay;
                 }
             }
 
@@ -522,6 +532,28 @@
                         const categoryB = getAspectRatioCategory(b.aspectRatio);
                         const order = { 'Square': 0, 'Portrait': 1, 'Landscape': 2 };
                         return order[categoryA] - order[categoryB];
+                    });
+                    break;
+                case 'theme':
+                    imagesToSort.sort((a, b) => {
+                        const themeOrder = {
+                            'Ocean/Water': 0, 'Nature/Forest': 1, 'Desert/Sand': 2,
+                            'Sunset/Sunrise': 3, 'Urban/City': 4, 'Snow/Winter': 5,
+                            'Night/Dark': 6, 'General': 7
+                        };
+                        return (themeOrder[a.theme] || 8) - (themeOrder[b.theme] || 8);
+                    });
+                    break;
+                case 'season':
+                    imagesToSort.sort((a, b) => {
+                        const seasonOrder = { 'Spring': 0, 'Summer': 1, 'Fall': 2, 'Winter': 3, 'Unknown': 4 };
+                        return seasonOrder[a.season] - seasonOrder[b.season];
+                    });
+                    break;
+                case 'timeOfDay':
+                    imagesToSort.sort((a, b) => {
+                        const timeOrder = { 'Sunrise': 0, 'Day': 1, 'Sunset': 2, 'Night': 3, 'Unknown': 4 };
+                        return timeOrder[a.timeOfDay] - timeOrder[b.timeOfDay];
                     });
                     break;
                 case 'random':
@@ -615,11 +647,16 @@
                     const averageLuminance = (0.2126 * avgR + 0.7152 * avgG + 0.0722 * avgB);
                     const hue = rgbToHsl(avgR, avgG, avgB).h;
 
-                    resolve({ dominantColor, averageLuminance, hue, aspectRatio });
+                    // Theme detection based on color analysis
+                    const theme = detectTheme(avgR, avgG, avgB, hue, averageLuminance);
+                    const season = detectSeason(hue, averageLuminance);
+                    const timeOfDay = detectTimeOfDay(averageLuminance, hue);
+
+                    resolve({ dominantColor, averageLuminance, hue, aspectRatio, theme, season, timeOfDay });
                 };
                 img.onerror = () => {
                     console.error('Error loading image for processing:', dataURL);
-                    resolve({ dominantColor: '#FFFFFF', averageLuminance: 255, hue: 0, aspectRatio: 1 });
+                    resolve({ dominantColor: '#FFFFFF', averageLuminance: 255, hue: 0, aspectRatio: 1, theme: 'Unknown', season: 'Unknown', timeOfDay: 'Unknown' });
                 };
                 img.src = dataURL;
             });
@@ -660,6 +697,80 @@
             }
         }
 
+        // Theme detection functions
+        function detectTheme(r, g, b, hue, luminance) {
+            // Ocean/Water theme - blues and cyans
+            if (hue >= 180 && hue <= 240 && luminance > 100) {
+                return 'Ocean/Water';
+            }
+            // Forest/Nature theme - greens
+            if (hue >= 90 && hue <= 150 && luminance > 80) {
+                return 'Nature/Forest';
+            }
+            // Desert/Sand theme - yellows and oranges
+            if (hue >= 30 && hue <= 60 && luminance > 120) {
+                return 'Desert/Sand';
+            }
+            // Sunset/Sunrise theme - warm oranges and reds
+            if (hue >= 0 && hue <= 30 && luminance > 100) {
+                return 'Sunset/Sunrise';
+            }
+            // Urban/City theme - grays and muted colors
+            if (luminance < 100 && (Math.abs(r - g) < 30 && Math.abs(g - b) < 30)) {
+                return 'Urban/City';
+            }
+            // Snow/Winter theme - whites and very light colors
+            if (luminance > 180 && (r > 200 && g > 200 && b > 200)) {
+                return 'Snow/Winter';
+            }
+            // Night/Dark theme - very low luminance
+            if (luminance < 60) {
+                return 'Night/Dark';
+            }
+            // Default to general theme
+            return 'General';
+        }
+
+        function detectSeason(hue, luminance) {
+            // Spring - bright greens and pastels
+            if (hue >= 90 && hue <= 150 && luminance > 120) {
+                return 'Spring';
+            }
+            // Summer - bright, warm colors
+            if (hue >= 30 && hue <= 90 && luminance > 130) {
+                return 'Summer';
+            }
+            // Fall - warm oranges, reds, browns
+            if (hue >= 0 && hue <= 45 && luminance > 80 && luminance < 150) {
+                return 'Fall';
+            }
+            // Winter - whites, grays, cool colors
+            if (luminance > 150 || (hue >= 200 && hue <= 240)) {
+                return 'Winter';
+            }
+            return 'Unknown';
+        }
+
+        function detectTimeOfDay(luminance, hue) {
+            // Night - very low luminance
+            if (luminance < 60) {
+                return 'Night';
+            }
+            // Sunrise - warm colors with medium luminance
+            if (hue >= 0 && hue <= 45 && luminance > 80 && luminance < 150) {
+                return 'Sunrise';
+            }
+            // Day - bright, high luminance
+            if (luminance > 150) {
+                return 'Day';
+            }
+            // Sunset - warm colors with medium-high luminance
+            if (hue >= 0 && hue <= 30 && luminance > 100) {
+                return 'Sunset';
+            }
+            return 'Unknown';
+        }
+
 
         function displayGroupedImages(groupedImages, method) {
             resultsDiv.innerHTML = '';
@@ -674,6 +785,9 @@
                 averageShade: 'Average Shade',
                 hue: 'Hue',
                 aspectRatio: 'Aspect Ratio',
+                theme: 'Theme/Aesthetic',
+                season: 'Seasonal',
+                timeOfDay: 'Time of Day',
                 random: 'Random'
             };
 
@@ -702,6 +816,52 @@
                 } else if (method === 'aspectRatio' && group.length > 0) {
                     const firstCategory = getAspectRatioCategory(group[0].aspectRatio);
                     groupTitle.textContent = `Group ${index + 1} (${firstCategory})`;
+                } else if (method === 'theme' && group.length > 0) {
+                    const firstTheme = group[0].theme;
+                    groupTitle.textContent = `Group ${index + 1} (${firstTheme})`;
+                    // Add theme-specific styling
+                    const themeColors = {
+                        'Ocean/Water': { bg: '#e3f2fd', text: '#1565c0' },
+                        'Nature/Forest': { bg: '#e8f5e8', text: '#2e7d32' },
+                        'Desert/Sand': { bg: '#fff3e0', text: '#ef6c00' },
+                        'Sunset/Sunrise': { bg: '#fff8e1', text: '#f57c00' },
+                        'Urban/City': { bg: '#f5f5f5', text: '#424242' },
+                        'Snow/Winter': { bg: '#fafafa', text: '#546e7a' },
+                        'Night/Dark': { bg: '#263238', text: '#ffffff' },
+                        'General': { bg: '#f3e5f5', text: '#7b1fa2' }
+                    };
+                    if (themeColors[firstTheme]) {
+                        groupTitle.style.backgroundColor = themeColors[firstTheme].bg;
+                        groupTitle.style.color = themeColors[firstTheme].text;
+                    }
+                } else if (method === 'season' && group.length > 0) {
+                    const firstSeason = group[0].season;
+                    groupTitle.textContent = `Group ${index + 1} (${firstSeason})`;
+                    // Add season-specific styling
+                    const seasonColors = {
+                        'Spring': { bg: '#e8f5e8', text: '#2e7d32' },
+                        'Summer': { bg: '#fff3e0', text: '#ef6c00' },
+                        'Fall': { bg: '#fff8e1', text: '#f57c00' },
+                        'Winter': { bg: '#fafafa', text: '#546e7a' }
+                    };
+                    if (seasonColors[firstSeason]) {
+                        groupTitle.style.backgroundColor = seasonColors[firstSeason].bg;
+                        groupTitle.style.color = seasonColors[firstSeason].text;
+                    }
+                } else if (method === 'timeOfDay' && group.length > 0) {
+                    const firstTime = group[0].timeOfDay;
+                    groupTitle.textContent = `Group ${index + 1} (${firstTime})`;
+                    // Add time-specific styling
+                    const timeColors = {
+                        'Sunrise': { bg: '#fff8e1', text: '#f57c00' },
+                        'Day': { bg: '#fffde7', text: '#f9a825' },
+                        'Sunset': { bg: '#fff3e0', text: '#ef6c00' },
+                        'Night': { bg: '#263238', text: '#ffffff' }
+                    };
+                    if (timeColors[firstTime]) {
+                        groupTitle.style.backgroundColor = timeColors[firstTime].bg;
+                        groupTitle.style.color = timeColors[firstTime].text;
+                    }
                 } else {
                     groupTitle.textContent = `Group ${index + 1}`;
                 }
@@ -719,7 +879,7 @@
                     imgElement.src = imgData.dataURL;
                     imgElement.alt = imgData.file.name;
                     imgElement.className = 'w-full h-full object-cover img-element';
-                    imgElement.title = `File: ${imgData.file.name}\nColor: ${imgData.colorData || 'N/A'}\nShade: ${imgData.shadeData ? imgData.shadeData.toFixed(2) : 'N/A'}\nHue: ${imgData.hue ? Math.round(imgData.hue) : 'N/A'}°\nAspect Ratio: ${imgData.aspectRatio ? getAspectRatioCategory(imgData.aspectRatio) : 'N/A'}`;
+                    imgElement.title = `File: ${imgData.file.name}\nColor: ${imgData.colorData || 'N/A'}\nShade: ${imgData.shadeData ? imgData.shadeData.toFixed(2) : 'N/A'}\nHue: ${imgData.hue ? Math.round(imgData.hue) : 'N/A'}°\nAspect Ratio: ${imgData.aspectRatio ? getAspectRatioCategory(imgData.aspectRatio) : 'N/A'}\nTheme: ${imgData.theme || 'N/A'}\nSeason: ${imgData.season || 'N/A'}\nTime: ${imgData.timeOfDay || 'N/A'}`;
 
                     imgWrapper.appendChild(imgElement);
                     imagesWrapper.appendChild(imgWrapper);
